@@ -1,0 +1,14 @@
+name = "async26-analysis"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# Runs the analysis once a minute (the shortest interval cron supports).
+[triggers]
+crons = ["* * * * *"]
+
+# Makes console.log output visible in the Cloudflare dashboard (Workers -> Logs).
+[observability]
+enabled = true
+
+workers_dev = false
+preview_urls = false
