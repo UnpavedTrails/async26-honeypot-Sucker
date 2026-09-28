@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>async/26 — honeypot watch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0A0E16;
+    --surface: #121A26;
+    --surface-2: #1A2332;
+    --border: #232E40;
+    --text: #E7ECF3;
+    --muted: #7C8BA0;
+    --accent: #3ECF8E;
+    --accent-soft: rgba(62, 207, 142, 0.14);
+    --warn: #E0A83E;
+    --warn-soft: rgba(224, 168, 62, 0.14);
+    --danger: #EA5A4A;
+    --danger-soft: rgba(234, 90, 74, 0.14);
+    --sans: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: inherit; }
+
+  .shell {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  header.topbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+
+  .brand-block h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 10px 0 4px;
+    letter-spacing: -0.01em;
+  }
+
+  .brand-block p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 0 var(--accent-soft);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(62, 207, 142, 0.5); }
+    70%  { box-shadow: 0 0 0 8px rgba(62, 207, 142, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(62, 207, 142, 0); }
+  }
+
+  .stats {
+    display: flex;
+    gap: 28px;
+  }
+
+  .stat {
+    text-align: right;
+  }
+
+  .stat .num {
+    display: block;
+    font-family: var(--mono);
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .stat .label {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .empty-state {
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 40px 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .session-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+    margin-bottom: 16px;
+    transition: background 1.4s ease;
+  }
+
+  .session-card.flash {
+    background: var(--accent-soft);
+    transition: background 0s;
+  }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .session-id {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .session-id b {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .meta-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .last-seen {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .severity-meter {
+    display: flex;
+    gap: 3px;
+  }
+
+  .severity-meter span {
+    width: 7px;
+    height: 16px;
+    border-radius: 2px;
+    background: var(--border);
+  }
+
+  .severity-meter span.filled.low { background: var(--accent); }
+  .severity-meter span.filled.mid { background: var(--warn); }
+  .severity-meter span.filled.high { background: var(--danger); }
+
+  .narration {
+    font-size: 15px;
+    color: var(--text);
+    margin: 0 0 12px;
+  }
+
+  .tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  .tag {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 100px;
+    font-weight: 600;
+  }
+
+  .tag.intent { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+  .tag.action { background: var(--accent-soft); color: var(--accent); }
+
+  .card-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .raw-toggle {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .raw-toggle:hover { color: var(--text); }
+
+  .download-btn {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+
+  .download-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .raw-log {
+    margin-top: 14px;
+    display: none;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+
+  .raw-log.open { display: block; }
+
+  .raw-entry {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    word-break: break-all;
+  }
+
+  .raw-entry:last-child { border-bottom: none; }
+
+  .raw-entry .req-line { color: var(--text); }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 40px;
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <header class="topbar">
+    <div class="brand-block">
+      <span class="status"><span class="pulse-dot"></span>Monitoring</span>
+      <h1>async/26 — honeypot watch</h1>
+      <p>Live activity and AI narration from the decoy server.</p>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <span class="num" id="sessionCount">0</span>
+        <span class="label">sessions</span>
+      </div>
+      <div class="stat">
+        <span class="num" id="requestCount">0</span>
+        <span class="label">requests logged</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="feed">
+    <div class="empty-state" id="emptyState">
+      No activity yet — once something touches the honeypot, it'll show up here automatically.
+    </div>
+  </main>
+
+  <footer>ASYNC'26 · Track 3 · Cybersecurity &amp; Defense</footer>
+</div>
+
+<script>
+  // ---- CONFIG -------------------------------------------------------
+  // Safe to put directly here and even commit: this is the anon (public)
+  // key, and RLS restricts it to read-only on these two tables. Never
+  // put the service_role key here - that one stays server-side only.
+  const SUPABASE_URL = 'https://eyonmyfmcjgauvsdrnuo.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5b25teWZtY2pnYXV2c2RybnVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA0MDc4NDMsImV4cCI6MjEwNTk4Mzg0M30.YLPpFeSHn035UjG9gfunF615QeEWwE41oyjKFEo_PqM';
+  // ---------------------------------------------------------------------
+
+  // Named `sb`, not `supabase` - the library itself already uses the global
+  // name `supabase` (window.supabase), so reusing it here causes a
+  // "already been declared" crash that silently kills the entire script.
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const sessions = new Map(); // session_id -> { logs: [], analyses: [] }
+  let totalRequestCount = 0;
+
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function timeAgo(isoString) {
+    const diffMs = Date.now() - new Date(isoString).getTime();
+    const s = Math.floor(diffMs / 1000);
+    if (s < 5) return 'just now';
+    if (s < 60) return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  }
+
+  function severityBand(score) {
+    if (score >= 4) return 'high';
+    if (score === 3) return 'mid';
+    return 'low';
+  }
+
+  function formatLabel(label) {
+    if (!label) return 'Unclassified';
+    return label.charAt(0).toUpperCase() + label.slice(1).replace(/-/g, ' ');
+  }
+
+  function getOrCreateSession(sessionId) {
+    if (!sessions.has(sessionId)) {
+      sessions.set(sessionId, { logs: [], analyses: [] });
+    }
+    return sessions.get(sessionId);
+  }
+
+  function addLog(log, isLive) {
+    const s = getOrCreateSession(log.session_id);
+    if (!s.logs.some((l) => l.id === log.id)) {
+      s.logs.push(log);
+      totalRequestCount++;
+    }
+    if (isLive) s._flash = true;
+  }
+
+  function addAnalysis(a, isLive) {
+    const s = getOrCreateSession(a.session_id);
+    if (!s.analyses.some((x) => x.id === a.id)) {
+      s.analyses.push(a);
+    }
+    if (isLive) s._flash = true;
+  }
+
+  function lastActivity(s) {
+    const logTimes = s.logs.map((l) => new Date(l.timestamp).getTime());
+    const analysisTimes = s.analyses.map((a) => new Date(a.created_at).getTime());
+    return Math.max(0, ...logTimes, ...analysisTimes);
+  }
+
+  function renderSeverityMeter(score) {
+    const band = severityBand(score || 0);
+    let html = '';
+    for (let i = 1; i <= 5; i++) {
+      const filled = i <= (score || 0) ? `filled ${band}` : '';
+      html += `<span class="${filled}"></span>`;
+    }
+    return html;
+  }
+
+  function renderCard(sessionId, s) {
+    const latest = s.analyses[s.analyses.length - 1];
+    const ip = s.logs[0] ? escapeHtml(s.logs[0].ip_address) : 'unknown';
+    const last = lastActivity(s);
+
+    const rawEntries = s.logs
+      .slice()
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+      .map((l) => `
+        <div class="raw-entry">
+          <span class="req-line">${escapeHtml(l.method)} ${escapeHtml(l.path)}</span><br>
+          ${new Date(l.timestamp).toLocaleTimeString()} · body: ${escapeHtml(JSON.stringify(l.body)).slice(0, 200)}
+        </div>
+      `).join('');
+
+    const narrationBlock = latest
+      ? `
+        <p class="narration">${escapeHtml(latest.narration)}</p>
+        <div class="tags">
+          <span class="tag intent">${escapeHtml(formatLabel(latest.intent_label))}</span>
+          <span class="tag action">${escapeHtml(latest.recommended_action || '')}</span>
+        </div>
+      `
+      : `<p class="narration" style="color: var(--muted);">Analysis pending…</p>`;
+
+    return `
+      <div class="session-card ${s._flash ? 'flash' : ''}" data-session="${escapeHtml(sessionId)}">
+        <div class="card-head">
+          <span class="session-id">session <b>${escapeHtml(sessionId)}</b> · ${ip} · ${s.logs.length} request${s.logs.length === 1 ? '' : 's'}</span>
+          <div class="meta-right">
+            <span class="last-seen">${timeAgo(new Date(last).toISOString())}</span>
+            <div class="severity-meter">${renderSeverityMeter(latest ? latest.severity_score : 0)}</div>
+          </div>
+        </div>
+        ${narrationBlock}
+        <div class="card-foot">
+          <button class="raw-toggle" onclick="toggleRaw('${escapeHtml(sessionId)}')">▸ view raw requests</button>
+          <button class="download-btn" onclick="downloadReport('${escapeHtml(sessionId)}')">Download report</button>
+        </div>
+        <div class="raw-log" id="raw-${escapeHtml(sessionId)}">${rawEntries}</div>
+      </div>
+    `;
+  }
+
+  function render() {
+    const feed = document.getElementById('feed');
+    const emptyState = document.getElementById('emptyState');
+    const ids = Array.from(sessions.keys()).sort((a, b) => lastActivity(sessions.get(b)) - lastActivity(sessions.get(a)));
+
+    document.getElementById('sessionCount').textContent = ids.length;
+    document.getElementById('requestCount').textContent = totalRequestCount;
+
+    if (ids.length === 0) {
+      emptyState.style.display = 'block';
+      return;
+    }
+    emptyState.style.display = 'none';
+
+    feed.innerHTML = emptyState.outerHTML + ids.map((id) => renderCard(id, sessions.get(id))).join('');
+    document.getElementById('emptyState').style.display = 'none';
+
+    // Trigger flash animation on freshly-updated cards, then clear the flag
+    ids.forEach((id) => {
+      const s = sessions.get(id);
+      if (s._flash) {
+        const card = document.querySelector(`.session-card[data-session="${CSS.escape(id)}"]`);
+        if (card) {
+          void card.offsetWidth; // force reflow so the transition restarts
+          requestAnimationFrame(() => card.classList.remove('flash'));
+        }
+        s._flash = false;
+      }
+    });
+  }
+
+  function toggleRaw(sessionId) {
+    const el = document.getElementById(`raw-${sessionId}`);
+    if (el) el.classList.toggle('open');
+  }
+
+  function downloadReport(sessionId) {
+    const s = sessions.get(sessionId);
+    if (!s) return;
+
+    const logs = s.logs.slice().sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const analyses = s.analyses.slice().sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const ips = [...new Set(logs.map((l) => l.ip_address))].join(', ');
+    const first = logs[0] ? new Date(logs[0].timestamp).toLocaleString() : 'n/a';
+    const last = logs[logs.length - 1] ? new Date(logs[logs.length - 1].timestamp).toLocaleString() : 'n/a';
+
+    let md = `# Honeypot Session Report\n\n`;
+    md += `**Session:** ${sessionId}\n`;
+    md += `**IP address(es):** ${ips}\n`;
+    md += `**First seen:** ${first}\n`;
+    md += `**Last seen:** ${last}\n`;
+    md += `**Total requests:** ${logs.length}\n\n`;
+    md += `## Analysis\n\n`;
+
+    if (analyses.length === 0) {
+      md += `_No analysis recorded yet for this session._\n\n`;
+    } else {
+      analyses.forEach((a, i) => {
+        md += `### Entry ${i + 1} — ${new Date(a.created_at).toLocaleString()}\n`;
+        md += `- **Intent:** ${formatLabel(a.intent_label)}\n`;
+        md += `- **Severity:** ${a.severity_score}/5\n`;
+        md += `- **Recommended action:** ${a.recommended_action}\n\n`;
+        md += `${a.narration}\n\n`;
+      });
+    }
+
+    md += `## Raw Activity Log\n\n`;
+    md += `| Time | Method | Path |\n|---|---|---|\n`;
+    logs.forEach((l) => {
+      md += `| ${new Date(l.timestamp).toLocaleTimeString()} | ${l.method} | ${l.path} |\n`;
+    });
+
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `honeypot-report-${sessionId}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function loadInitial() {
+    const { data: logs, error: logsErr } = await sb
+      .from('raw_logs')
+      .select('*')
+      .order('timestamp', { ascending: true });
+    if (logsErr) console.error('[load raw_logs error]', logsErr.message);
+    (logs || []).forEach((l) => addLog(l, false));
+
+    const { data: analyses, error: analysisErr } = await sb
+      .from('analysis')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (analysisErr) console.error('[load analysis error]', analysisErr.message);
+    (analyses || []).forEach((a) => addAnalysis(a, false));
+
+    render();
+  }
+
+  function subscribeRealtime() {
+    sb
+      .channel('honeypot-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'raw_logs' }, (payload) => {
+        addLog(payload.new, true);
+        render();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'analysis' }, (payload) => {
+        addAnalysis(payload.new, true);
+        render();
+      })
+      .subscribe((status) => {
+        console.log('[realtime]', status);
+      });
+  }
+
+  loadInitial();
+  subscribeRealtime();
+</script>
+
+</body>
+</html>

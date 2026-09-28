@@ -1,0 +1,14 @@
+{
+  "name": "analysis-service",
+  "version": "1.0.0",
+  "description": "ASYNC'26 analysis service - reads honeypot logs, analyzes sessions with Gemini, writes narration back to Supabase",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@google/genai": "^1.0.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5"
+  }
+}

