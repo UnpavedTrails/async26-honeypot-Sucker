@@ -172,7 +172,6 @@ Other measures:
 
 ## Team
 
-- **Team name:** `Charlie's Angels`
 - **Track:** Cybersecurity & Defense
 
 *Built for ASYNC'26.*
